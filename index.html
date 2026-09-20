@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Home Panel</title>
+<style>
+  :root{
+    --bg:#0e1210; --panel:#161c19; --panel-edge:#242e29;
+    --amber:#f2a33d; --amber-dim:#7a5a2c; --green:#5ec98d; --red:#e2604f;
+    --text:#e7ece9; --text-dim:#8a9691; --mono:"SF Mono","Consolas","Menlo",monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:var(--bg); color:var(--text);
+    font-family:-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; align-items:center; padding:32px 16px 64px;
+  }
+  h1{ font-size:1.1rem; font-weight:600; letter-spacing:.02em; color:var(--text-dim); margin:0 0 4px; }
+  .sub{ color:var(--text-dim); font-size:.8rem; margin-bottom:24px; }
+
+  /* ---- login screen ---- */
+  #loginScreen{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:80vh; width:100%; max-width:340px;
+  }
+  #loginScreen .box{
+    width:100%; background:var(--panel); border:1px solid var(--panel-edge);
+    border-radius:14px; padding:28px;
+  }
+  #loginScreen input{
+    width:100%; background:var(--bg); border:1px solid var(--panel-edge);
+    color:var(--text); padding:10px 12px; border-radius:6px; font-size:.9rem;
+    margin-bottom:12px;
+  }
+  #loginScreen button{
+    width:100%; background:var(--amber); color:#1a1206; border:none;
+    border-radius:6px; padding:11px; font-weight:600; font-size:.9rem; cursor:pointer;
+  }
+  #loginError{ color:var(--red); font-size:.8rem; margin-top:10px; min-height:1em; text-align:center; }
+
+  /* ---- dashboard (hidden until logged in) ---- */
+  #dashboard{ display:none; width:100%; flex-direction:column; align-items:center; }
+
+  .status{ display:flex; align-items:center; gap:8px; margin-bottom:24px; font-size:.8rem; color:var(--text-dim); }
+  .dot{ width:8px; height:8px; border-radius:50%; background:var(--text-dim); }
+  .dot.ok{ background:var(--green); box-shadow:0 0 8px var(--green); }
+  .dot.bad{ background:var(--red); box-shadow:0 0 8px var(--red); }
+
+  .panel{ width:100%; max-width:460px; background:var(--panel); border:1px solid var(--panel-edge);
+    border-radius:14px; padding:20px; margin-bottom:16px; }
+  .panel-title{ font-size:.75rem; color:var(--text-dim); letter-spacing:.03em; margin-bottom:14px; }
+  .panel-row{ display:flex; justify-content:space-between; align-items:center; }
+  .panel-label{ font-size:.9rem; }
+
+  .toggle-track{ width:56px; height:30px; border-radius:16px; background:var(--panel-edge);
+    position:relative; cursor:pointer; border:1px solid var(--amber-dim); transition:background .15s; flex-shrink:0; }
+  .toggle-track.on{ background:var(--amber); }
+  .toggle-knob{ position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%;
+    background:var(--text); transition:left .15s; }
+  .toggle-track.on .toggle-knob{ left:29px; background:#1a1206; }
+
+  .timer-row{ display:flex; gap:10px; margin-top:16px; align-items:flex-end; }
+  .timer-field{ display:flex; flex-direction:column; gap:4px; }
+  .timer-field label{ font-size:.7rem; color:var(--text-dim); }
+  .timer-field input{ width:90px; background:var(--bg); border:1px solid var(--panel-edge);
+    color:var(--text); padding:8px; border-radius:6px; font-family:var(--mono); font-size:.9rem; }
+  .timer-row button{ background:var(--panel-edge); color:var(--text); border:1px solid var(--amber-dim);
+    border-radius:6px; padding:9px 14px; font-size:.8rem; cursor:pointer; }
+  .timer-row button:disabled{ opacity:.35; cursor:not-allowed; border-color:var(--panel-edge); }
+  .countdown{ font-family:var(--mono); font-size:.85rem; color:var(--amber); margin-top:10px; }
+
+  .readouts{ display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%; max-width:460px; }
+  .readout{ background:var(--panel); border:1px solid var(--panel-edge); border-radius:14px; padding:18px; text-align:center; }
+  .readout .value{ font-family:var(--mono); font-size:1.6rem; font-weight:600; color:var(--amber); line-height:1.1; }
+  .readout .unit{ font-size:.72rem; color:var(--text-dim); margin-top:4px; }
+
+  .err{ color:var(--red); font-size:.78rem; margin-top:14px; text-align:center; max-width:460px; }
+  .logout{ margin-top:24px; background:none; border:1px solid var(--panel-edge); color:var(--text-dim);
+    padding:8px 14px; border-radius:6px; font-size:.75rem; cursor:pointer; }
+</style>
+</head>
+<body>
+
+  <!-- ================= LOGIN SCREEN ================= -->
+  <div id="loginScreen">
+    <h1>HOME PANEL</h1>
+    <div class="sub">Sign in to continue</div>
+    <div class="box">
+      <input id="userInput" type="text" placeholder="Username" autocomplete="username">
+      <input id="passInput" type="password" placeholder="Password" autocomplete="current-password">
+      <button id="loginBtn">Sign in</button>
+      <div id="loginError"></div>
+    </div>
+  </div>
+
+  <!-- ================= DASHBOARD ================= -->
+  <div id="dashboard">
+    <h1>HOME PANEL</h1>
+    <div class="sub">Light + Geyser control &middot; live power monitoring on Geyser</div>
+
+    <div class="status">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">Connecting...</span>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">LIGHT</div>
+      <div class="panel-row">
+        <span class="panel-label">On / Off</span>
+        <div class="toggle-track" id="lightToggle"><div class="toggle-knob"></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">GEYSER</div>
+      <div class="panel-row">
+        <span class="panel-label">On / Off</span>
+        <div class="toggle-track" id="geyserToggle"><div class="toggle-knob"></div></div>
+      </div>
+      <div class="timer-row">
+        <div class="timer-field">
+          <label>Duration (mm:ss)</label>
+          <input id="timeInput" type="text" placeholder="1:50" value="">
+        </div>
+        <button id="startBtn" disabled>Start</button>
+      </div>
+      <div class="countdown" id="countdown">Remaining: --</div>
+    </div>
+
+    <div class="readouts">
+      <div class="readout"><div class="value" id="currentVal">--</div><div class="unit">mA current</div></div>
+      <div class="readout"><div class="value" id="powerVal">--</div><div class="unit">mW power</div></div>
+      <div class="readout"><div class="value" id="voltageVal">--</div><div class="unit">V bus voltage</div></div>
+      <div class="readout"><div class="value" id="energyVal">--</div><div class="unit">mWh used so far</div></div>
+    </div>
+
+    <div class="err" id="errBox"></div>
+    <button class="logout" id="logoutBtn">Sign out</button>
+  </div>
+
+<script>
+/* ===================== LOGIN ===================== */
+// Hardcoded for the one household user. This ONLY hides the UI in the browser —
+// it is not a real security boundary (visible in page source to anyone who looks).
+// Real protection is the server-side check in api/blynk.js using APP_SECRET.
+const VALID_USER = "home";
+const VALID_PASS = "home123";
+
+// Must exactly match the APP_SECRET environment variable you set in Vercel.
+const APP_SECRET = "CHANGE-THIS-TO-A-RANDOM-STRING";
+
+const loginScreen = document.getElementById("loginScreen");
+const dashboard   = document.getElementById("dashboard");
+const loginBtn    = document.getElementById("loginBtn");
+const loginError  = document.getElementById("loginError");
+const userInput   = document.getElementById("userInput");
+const passInput   = document.getElementById("passInput");
+const logoutBtn   = document.getElementById("logoutBtn");
+
+function showDashboard() {
+  loginScreen.style.display = "none";
+  dashboard.style.display = "flex";
+  startPolling();
+}
+
+loginBtn.addEventListener("click", () => {
+  if (userInput.value === VALID_USER && passInput.value === VALID_PASS) {
+    sessionStorage.setItem("loggedIn", "yes");
+    loginError.textContent = "";
+    showDashboard();
+  } else {
+    loginError.textContent = "Incorrect username or password";
+  }
+});
+passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") loginBtn.click(); });
+
+logoutBtn.addEventListener("click", () => {
+  sessionStorage.removeItem("loggedIn");
+  dashboard.style.display = "none";
+  loginScreen.style.display = "flex";
+  if (pollTimer) clearInterval(pollTimer);
+  if (tickTimer) clearInterval(tickTimer);
+});
+
+if (sessionStorage.getItem("loggedIn") === "yes") showDashboard();
+
+/* ===================== DASHBOARD LOGIC ===================== */
+let lightState = 0, geyserState = 0;
+let pollTimer = null, tickTimer = null;
+let serverRemaining = 0, serverRemainingAt = 0;
+
+const statusDot    = document.getElementById("statusDot");
+const statusText   = document.getElementById("statusText");
+const lightToggle  = document.getElementById("lightToggle");
+const geyserToggle = document.getElementById("geyserToggle");
+const timeInput    = document.getElementById("timeInput");
+const startBtn     = document.getElementById("startBtn");
+const countdown    = document.getElementById("countdown");
+const currentVal   = document.getElementById("currentVal");
+const powerVal     = document.getElementById("powerVal");
+const voltageVal   = document.getElementById("voltageVal");
+const energyVal    = document.getElementById("energyVal");
+const errBox       = document.getElementById("errBox");
+
+function setStatus(ok, msg) {
+  statusDot.className = "dot " + (ok === null ? "" : ok ? "ok" : "bad");
+  statusText.textContent = msg;
+}
+
+async function getPin(pin) {
+  const res = await fetch(`/api/blynk?action=get&pin=${pin}`, {
+    headers: { "x-app-secret": APP_SECRET }
+  });
+  if (!res.ok) throw new Error(`${pin} -> HTTP ${res.status}`);
+  const text = await res.text();
+  return text.replace(/[\[\]"]/g, "");
+}
+async function setPin(pin, value) {
+  const res = await fetch(`/api/blynk?action=update&pin=${pin}&value=${value}`, {
+    headers: { "x-app-secret": APP_SECRET }
+  });
+  if (!res.ok) throw new Error(`set ${pin} -> HTTP ${res.status}`);
+}
+
+function parseDuration(raw) {
+  const s = raw.trim().toLowerCase();
+  if (!s) return null;
+  let m = s.match(/^(\d+)\s*:\s*(\d+)$/);
+  if (m) return { min: parseInt(m[1]), sec: parseInt(m[2]) };
+  m = s.match(/^(\d+)\s*m\s*(\d+)?\s*s?$/);
+  if (m) return { min: parseInt(m[1]), sec: m[2] ? parseInt(m[2]) : 0 };
+  m = s.match(/^(\d+)\s*s$/);
+  if (m) { const t = parseInt(m[1]); return { min: Math.floor(t/60), sec: t%60 }; }
+  m = s.match(/^(\d+)$/);
+  if (m) { const t = parseInt(m[1]); return { min: Math.floor(t/60), sec: t%60 }; }
+  return null;
+}
+function updateStartBtnState() {
+  const parsed = parseDuration(timeInput.value);
+  const total = parsed ? parsed.min * 60 + parsed.sec : 0;
+  startBtn.disabled = total <= 0;
+}
+timeInput.addEventListener("input", updateStartBtnState);
+
+function renderCountdown() {
+  if (geyserState !== 1) { countdown.textContent = "Remaining: --"; return; }
+  const elapsed = Math.floor((Date.now() - serverRemainingAt) / 1000);
+  const shown = Math.max(0, serverRemaining - elapsed);
+  countdown.textContent = `Remaining: ${Math.floor(shown/60)}m ${shown%60}s`;
+}
+
+async function poll() {
+  try {
+    const [v0, v1, v4, v6, v7, v8, v9] = await Promise.all(
+      ["V0","V1","V4","V6","V7","V8","V9"].map(getPin)
+    );
+    lightState = parseInt(v0) || 0;
+    geyserState = parseInt(v1) || 0;
+    lightToggle.classList.toggle("on", lightState === 1);
+    geyserToggle.classList.toggle("on", geyserState === 1);
+
+    serverRemaining = parseInt(v4) || 0;
+    serverRemainingAt = Date.now();
+    renderCountdown();
+
+    currentVal.textContent = parseFloat(v6).toFixed(1);
+    powerVal.textContent   = parseFloat(v7).toFixed(1);
+    voltageVal.textContent = parseFloat(v8).toFixed(2);
+    energyVal.textContent  = parseFloat(v9).toFixed(2);
+
+    setStatus(true, "Online");
+    errBox.textContent = "";
+  } catch (e) {
+    setStatus(false, "Connection error");
+    errBox.textContent = e.message;
+  }
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  if (tickTimer) clearInterval(tickTimer);
+  poll();
+  pollTimer = setInterval(poll, 2000);
+  tickTimer = setInterval(renderCountdown, 1000);
+}
+
+lightToggle.addEventListener("click", async () => {
+  const next = lightState === 1 ? 0 : 1;
+  try { await setPin("V0", next); lightState = next; lightToggle.classList.toggle("on", next===1); }
+  catch (e) { errBox.textContent = e.message; }
+});
+
+geyserToggle.addEventListener("click", async () => {
+  const next = geyserState === 1 ? 0 : 1;
+  try {
+    if (next === 1) { await setPin("V2", 0); await setPin("V3", 0); }
+    await setPin("V1", next);
+    geyserState = next;
+    geyserToggle.classList.toggle("on", next === 1);
+  } catch (e) { errBox.textContent = e.message; }
+});
+
+startBtn.addEventListener("click", async () => {
+  const parsed = parseDuration(timeInput.value);
+  if (!parsed || (parsed.min * 60 + parsed.sec) <= 0) return;
+  try {
+    await setPin("V2", parsed.min);
+    await setPin("V3", parsed.sec);
+    await setPin("V1", 1);
+    geyserState = 1;
+    geyserToggle.classList.add("on");
+  } catch (e) { errBox.textContent = e.message; }
+});
+</script>
+</body>
+</html>
