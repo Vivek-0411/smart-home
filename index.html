@@ -131,7 +131,11 @@
       <div class="readout"><div class="value" id="currentVal">--</div><div class="unit">mA current</div></div>
       <div class="readout"><div class="value" id="powerVal">--</div><div class="unit">mW power</div></div>
       <div class="readout"><div class="value" id="voltageVal">--</div><div class="unit">V bus voltage</div></div>
-      <div class="readout"><div class="value" id="energyVal">--</div><div class="unit">mWh used so far</div></div>
+      <div class="readout">
+        <div class="value" id="energyVal">--</div>
+        <div class="unit">mWh used so far</div>
+        <button id="resetEnergyBtn" style="margin-top:10px; background:var(--panel-edge); color:var(--text-dim); border:1px solid var(--panel-edge); border-radius:6px; padding:6px 10px; font-size:.72rem; cursor:pointer;">Reset</button>
+      </div>
     </div>
 
     <div class="err" id="errBox"></div>
@@ -179,15 +183,13 @@ logoutBtn.addEventListener("click", () => {
   dashboard.style.display = "none";
   loginScreen.style.display = "flex";
   if (pollTimer) clearInterval(pollTimer);
-  if (tickTimer) clearInterval(tickTimer);
 });
 
 if (sessionStorage.getItem("loggedIn") === "yes") showDashboard();
 
 /* ===================== DASHBOARD LOGIC ===================== */
 let lightState = 0, geyserState = 0;
-let pollTimer = null, tickTimer = null;
-let serverRemaining = 0, serverRemainingAt = 0;
+let pollTimer = null;
 
 const statusDot    = document.getElementById("statusDot");
 const statusText   = document.getElementById("statusText");
@@ -200,7 +202,16 @@ const currentVal   = document.getElementById("currentVal");
 const powerVal     = document.getElementById("powerVal");
 const voltageVal   = document.getElementById("voltageVal");
 const energyVal    = document.getElementById("energyVal");
+const resetEnergyBtn = document.getElementById("resetEnergyBtn");
 const errBox       = document.getElementById("errBox");
+
+resetEnergyBtn.addEventListener("click", async () => {
+  try {
+    await setPin("V10", 1);
+    resetEnergyBtn.textContent = "Done";
+    setTimeout(() => resetEnergyBtn.textContent = "Reset", 1000);
+  } catch (e) { errBox.textContent = e.message; }
+});
 
 function setStatus(ok, msg) {
   statusDot.className = "dot " + (ok === null ? "" : ok ? "ok" : "bad");
@@ -242,11 +253,9 @@ function updateStartBtnState() {
 }
 timeInput.addEventListener("input", updateStartBtnState);
 
-function renderCountdown() {
+function updateCountdownFromPoll(remaining) {
   if (geyserState !== 1) { countdown.textContent = "Remaining: --"; return; }
-  const elapsed = Math.floor((Date.now() - serverRemainingAt) / 1000);
-  const shown = Math.max(0, serverRemaining - elapsed);
-  countdown.textContent = `Remaining: ${Math.floor(shown/60)}m ${shown%60}s`;
+  countdown.textContent = `Remaining: ${Math.floor(remaining/60)}m ${remaining%60}s`;
 }
 
 async function poll() {
@@ -259,9 +268,7 @@ async function poll() {
     lightToggle.classList.toggle("on", lightState === 1);
     geyserToggle.classList.toggle("on", geyserState === 1);
 
-    serverRemaining = parseInt(v4) || 0;
-    serverRemainingAt = Date.now();
-    renderCountdown();
+    updateCountdownFromPoll(parseInt(v4) || 0);
 
     currentVal.textContent = parseFloat(v6).toFixed(1);
     powerVal.textContent   = parseFloat(v7).toFixed(1);
@@ -278,10 +285,8 @@ async function poll() {
 
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
-  if (tickTimer) clearInterval(tickTimer);
   poll();
   pollTimer = setInterval(poll, 2000);
-  tickTimer = setInterval(renderCountdown, 1000);
 }
 
 lightToggle.addEventListener("click", async () => {
